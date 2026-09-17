@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image to 3D - Doubao Seed3D</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+            background: #0B0E14;
+            color: #F8FAFC;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem; }
+        header { text-align: center; margin-bottom: 3rem; padding-top: 2rem; }
+        h1 {
+            font-size: 2.5rem; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, #38BDF8 0%, #22D3EE 100%);
+            -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .subtitle { color: #94A3B8; font-size: 1.1rem; }
+        .main-content { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 3rem; }
+        @media (max-width: 968px) { .main-content { grid-template-columns: 1fr; } }
+
+        .card { background: #1E293B; border: 1px solid #334155; border-radius: 12px; padding: 2rem; }
+        .card h2 { font-size: 1.5rem; margin-bottom: 1.5rem; color: #F8FAFC; }
+        .form-group { margin-bottom: 1.5rem; }
+        label { display: block; margin-bottom: 0.5rem; color: #CBD5E1; font-weight: 500; }
+
+        input[type="file"], input[type="url"], input[type="number"], input[type="password"], select, textarea {
+            width: 100%; padding: 0.75rem 1rem; background: #0F172A; border: 1px solid #334155;
+            border-radius: 8px; color: #F8FAFC; font-size: 1rem; transition: all 0.2s; font-family: inherit;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none; border-color: #38BDF8; box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.1);
+        }
+
+        .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 1px solid #334155; }
+        .tab {
+            padding: 0.75rem 1.5rem; background: transparent; border: none; color: #94A3B8;
+            cursor: pointer; border-bottom: 2px solid transparent; font-size: 1rem; transition: all 0.2s;
+        }
+        .tab.active { color: #38BDF8; border-bottom-color: #38BDF8; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .drop-zone {
+            border: 2px dashed #334155; border-radius: 10px; padding: 2rem; text-align: center;
+            color: #64748B; transition: all 0.2s; cursor: pointer;
+        }
+        .drop-zone.drag-over { border-color: #38BDF8; background: rgba(56, 189, 248, 0.06); color: #38BDF8; }
+        .drop-zone input[type="file"] { display: none; }
+        .drop-zone .hint { font-size: 0.9rem; margin-top: 0.5rem; }
+
+        .btn {
+            width: 100%; padding: 0.875rem 1.5rem; background: #F97316; color: #FFF; border: none;
+            border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s;
+        }
+        .btn:hover:not(:disabled) { background: #EA580C; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(249,115,22,0.3); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-secondary { background: #334155; color: #F8FAFC; width: auto; padding: 0.5rem 0.9rem; margin-top: 0.5rem; }
+        .btn-danger { background: #7F1D1D; color: #FECACA; width: auto; padding: 0.35rem 0.7rem; border: none; border-radius: 6px; cursor: pointer; }
+
+        .image-preview { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1rem; }
+        .image-preview .preview-card { position: relative; }
+        .image-preview img { max-width: 140px; max-height: 140px; border-radius: 8px; border: 1px solid #334155; display: block; }
+
+        .status { padding: 1rem; border-radius: 8px; margin-top: 1rem; display: none; }
+        .status.success { background: rgba(34,211,238,0.1); border: 1px solid #22D3EE; color: #22D3EE; }
+        .status.error { background: rgba(239,68,68,0.1); border: 1px solid #EF4444; color: #EF4444; }
+        .status.info { background: rgba(56,189,248,0.1); border: 1px solid #38BDF8; color: #38BDF8; }
+
+        .status-badge {
+            display: inline-block; padding: 0.25rem 0.75rem; border-radius: 6px; font-size: 0.875rem;
+            font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+        }
+        .status-badge.queued { background: #334155; color: #94A3B8; }
+        .status-badge.running { background: rgba(56,189,248,0.2); color: #38BDF8; }
+        .status-badge.succeeded { background: rgba(34,211,238,0.2); color: #22D3EE; }
+        .status-badge.failed, .status-badge.cancelled { background: rgba(239,68,68,0.2); color: #EF4444; }
+
+        .task-item { padding: 1rem; background: #0F172A; border: 1px solid #334155; border-radius: 8px; margin-bottom: 0.75rem; }
+        .task-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+        .task-id { font-family: 'SF Mono','Monaco','Courier New',monospace; font-size: 0.875rem; color: #94A3B8; word-break: break-all; }
+        .task-info { font-size: 0.875rem; color: #CBD5E1; }
+        .output-link {
+            display: inline-block; margin-top: 0.5rem; margin-right: 0.5rem; padding: 0.5rem 1rem;
+            background: #334155; color: #38BDF8; text-decoration: none; border-radius: 6px; font-size: 0.875rem;
+        }
+        .output-link:hover { background: #475569; }
+        .spinner {
+            display: inline-block; width: 16px; height: 16px; border: 2px solid #334155; border-top-color: #38BDF8;
+            border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 0.5rem; vertical-align: -3px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .param-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        @media (max-width: 640px) { .param-grid { grid-template-columns: 1fr; } }
+        .info-box {
+            background: rgba(56,189,248,0.05); border-left: 3px solid #38BDF8; padding: 1rem;
+            border-radius: 4px; margin-bottom: 1.5rem; font-size: 0.875rem; color: #CBD5E1;
+        }
+        .empty-state { text-align: center; padding: 3rem 1rem; color: #64748B; }
+        .check-row { display: flex; gap: 1.5rem; align-items: center; margin-bottom: 1rem; }
+        .check-row label { display: inline-flex; gap: 0.4rem; align-items: center; margin: 0; cursor: pointer; }
+        .auth-box { display: none; margin-bottom: 1.5rem; padding: 1rem; background: rgba(239,68,68,0.08); border: 1px solid #7F1D1D; border-radius: 8px; }
+        .auth-box input { margin-bottom: 0.5rem; }
+
+        .btn-preview {
+            display: inline-block; margin-top: 0.5rem; padding: 0.35rem 0.75rem; background: #0E7490;
+            color: #CFFAFE; border: none; border-radius: 6px; font-size: 0.875rem; cursor: pointer;
+        }
+        .btn-preview:hover { background: #155E75; }
+        .viewer-modal { display: none; position: fixed; inset: 0; z-index: 100; background: rgba(2,6,23,0.82); align-items: center; justify-content: center; padding: 1rem; }
+        .viewer-modal.open { display: flex; }
+        .viewer-card { background: #0F172A; border: 1px solid #334155; border-radius: 12px; width: min(920px, 96vw); height: min(80vh, 720px); display: flex; flex-direction: column; overflow: hidden; }
+        .viewer-header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; border-bottom: 1px solid #334155; }
+        .viewer-header h3 { font-size: 1rem; color: #E2E8F0; }
+        .viewer-close { background: #334155; border: none; color: #F8FAFC; width: 32px; height: 32px; border-radius: 6px; cursor: pointer; font-size: 1.1rem; }
+        .viewer-body { flex: 1; min-height: 0; position: relative; background: #0B0E14; }
+        .viewer-body model-viewer, .viewer-body canvas, .viewer-body .viewer-note { width: 100%; height: 100%; display: block; }
+        .viewer-note { color: #94A3B8; display: flex; align-items: center; justify-content: center; padding: 1rem; text-align: center; }
+        .viewer-loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #94A3B8; background: #0B0E14; }
+    </style>
+
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.0.0/dist/model-viewer.min.js"></script>
+    <script type="module" src="/static/viewer.js"></script>
+
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Image to 3D</h1>
+            <p class="subtitle">基于 Doubao-Seed3D-2.0 的图片转3D模型工具</p>
+        </header>
+
+        <div class="auth-box" id="authBox">
+            <label>访问令牌（服务端已启用 WEB_TOKEN）</label>
+            <input type="password" id="authTokenInput" placeholder="请输入访问令牌">
+            <button class="btn btn-secondary" id="authSaveBtn" type="button">保存令牌</button>
+        </div>
+
+        <div class="main-content">
+            <!-- Upload Section -->
+            <div class="card">
+                <h2>上传图片</h2>
+
+                <div class="info-box">
+                    <strong>图片要求：</strong> 分辨率 ≤ 4096×4096，单张 ≤ 10MB，宽高比 0.4~2.5；
+                    支持最多 4 张多视图图片。
+                </div>
+
+                <div class="tabs">
+                    <button class="tab active" data-tab="file" type="button" onclick="switchTab('file')">本地文件</button>
+                    <button class="tab" data-tab="url" type="button" onclick="switchTab('url')">图片URL</button>
+                </div>
+
+                <form id="convertForm">
+                    <div class="tab-content active" id="file-tab">
+                        <div class="drop-zone" id="dropZone">
+                            点击选择图片，或将图片拖拽到这里
+                            <div class="hint">可选择多张图片（最多 4 张）</div>
+                            <input type="file" id="imageFile" accept="image/*" multiple>
+                        </div>
+                        <div class="image-preview" id="preview"></div>
+                    </div>
+
+                    <div class="tab-content" id="url-tab">
+                        <div class="form-group">
+                            <label for="imageUrls">图片 URL（每行一个，最多 4 个）</label>
+                            <textarea id="imageUrls" rows="4" placeholder="https://example.com/image.jpg"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="param-grid">
+                        <div class="form-group">
+                            <label for="subdivisionLevel">网格质量</label>
+                            <select id="subdivisionLevel">
+                                <option value="low">低 (100K面)</option>
+                                <option value="medium" selected>中 (500K面)</option>
+                                <option value="high">高 (1M面)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="fileFormat">输出格式</label>
+                            <select id="fileFormat">
+                                <option value="glb" selected>GLB</option>
+                                <option value="obj">OBJ</option>
+                                <option value="usd">USD</option>
+                                <option value="usdz">USDZ</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="seedInput">随机种子（可选）</label>
+                        <input type="number" id="seedInput" placeholder="留空使用随机种子">
+                    </div>
+
+                    <div class="check-row">
+                        <label><input type="checkbox" id="draftCheck"> 草稿模式（更快、更便宜）</label>
+                        <label><input type="checkbox" id="autoProcessCheck"> 自动修复图片尺寸</label>
+                    </div>
+
+                    <button type="submit" class="btn" id="submitBtn">
+                        <span id="btnText">开始转换</span>
+                    </button>
+                </form>
+
+                <div class="status" id="statusMessage"></div>
+            </div>
+
+            <!-- Tasks Section -->
+            <div class="card">
+                <h2>转换任务</h2>
+                <div id="tasksList">
+                    <div class="empty-state">暂无任务</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3D model viewer modal -->
+    <div class="viewer-modal" id="viewerModal">
+        <div class="viewer-card">
+            <div class="viewer-header">
+                <h3 id="viewerTitle">3D 模型预览</h3>
+                <button class="viewer-close" id="viewerClose" type="button" aria-label="关闭">×</button>
+            </div>
+            <div class="viewer-body" id="viewerBody">
+                <div class="viewer-loading" id="viewerLoading">正在加载模型...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTab = 'file';
+        let pollingInterval = null;
+        let statusTimer = null;
+        let authRequired = false;
+        let authToken = localStorage.getItem('imageto3d.authToken') || '';
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, ch => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[ch]));
+        }
+
+        async function apiFetch(url, options = {}) {
+            const headers = new Headers(options.headers || {});
+            headers.set('X-Requested-With', 'XMLHttpRequest');
+            if (authToken) headers.set('X-Auth-Token', authToken);
+            return fetch(url, { ...options, headers });
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.toggle('active', t.id === `${tab}-tab`));
+        }
+
+        function showAuthBox() {
+            document.getElementById('authBox').style.display = 'block';
+        }
+
+        function saveToken() {
+            authToken = document.getElementById('authTokenInput').value.trim();
+            if (!authToken) return;
+            localStorage.setItem('imageto3d.authToken', authToken);
+            document.cookie = `imageto3d_token=${encodeURIComponent(authToken)}; path=/; SameSite=Strict; max-age=31536000`;
+            document.getElementById('authBox').style.display = 'none';
+            loadTasks();
+        }
+
+        // File preview and drag-and-drop
+        const fileInput = document.getElementById('imageFile');
+        const dropZone = document.getElementById('dropZone');
+
+        function renderPreviews(files) {
+            const preview = document.getElementById('preview');
+            preview.innerHTML = '';
+            for (const file of files) {
+                if (!file.type.startsWith('image/')) continue;
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    preview.insertAdjacentHTML('beforeend',
+                        `<div class="preview-card"><img src="${e.target.result}" alt="Preview"></div>`);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        fileInput.addEventListener('change', () => renderPreviews(fileInput.files));
+        dropZone.addEventListener('click', () => fileInput.click());
+        ['dragenter', 'dragover'].forEach(type => dropZone.addEventListener(type, e => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        }));
+        ['dragleave', 'drop'].forEach(type => dropZone.addEventListener(type, e => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+        }));
+        dropZone.addEventListener('drop', e => {
+            const files = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/'));
+            if (files.length) {
+                const dt = new DataTransfer();
+                files.forEach(f => dt.items.add(f));
+                fileInput.files = dt.files;
+                renderPreviews(fileInput.files);
+            }
+        });
+
+        // Form submission
+        document.getElementById('convertForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submitBtn');
+            const btnText = document.getElementById('btnText');
+            submitBtn.disabled = true;
+            btnText.innerHTML = '<span class="spinner"></span>处理中...';
+
+            try {
+                const formData = new FormData();
+                formData.append('subdivision_level', document.getElementById('subdivisionLevel').value);
+                formData.append('file_format', document.getElementById('fileFormat').value);
+                formData.append('draft', document.getElementById('draftCheck').checked ? 'true' : 'false');
+                formData.append('auto_process', document.getElementById('autoProcessCheck').checked ? 'true' : 'false');
+                const seed = document.getElementById('seedInput').value.trim();
+                if (seed) formData.append('seed', seed);
+
+                if (currentTab === 'file') {
+                    const files = [...fileInput.files];
+                    if (!files.length) throw new Error('请选择图片文件');
+                    if (files.length > 4) throw new Error('最多支持 4 张图片');
+                    files.forEach(file => formData.append('images', file));
+                } else {
+                    const urls = document.getElementById('imageUrls').value.split(/\n+/)
+                        .map(s => s.trim()).filter(Boolean);
+                    if (!urls.length) throw new Error('请输入图片URL');
+                    if (urls.length > 4) throw new Error('最多支持 4 个图片URL');
+                    formData.append('image_urls', urls.join('\n'));
+                }
+
+                const response = await apiFetch('/api/convert', { method: 'POST', body: formData });
+                const data = await response.json();
+                if (response.status === 401) { showAuthBox(); throw new Error('认证失败，请输入访问令牌'); }
+                if (!response.ok) throw new Error(data.error || '转换失败');
+
+                showStatus('success', `任务创建成功！任务ID: ${data.task_id}`);
+                startPolling(data.task_id);
+                loadTasks();
+            } catch (error) {
+                showStatus('error', error.message);
+            } finally {
+                submitBtn.disabled = false;
+                btnText.textContent = '开始转换';
+            }
+        });
+
+        function showStatus(type, message) {
+            const statusMessage = document.getElementById('statusMessage');
+            statusMessage.className = `status ${type}`;
+            statusMessage.textContent = message;
+            statusMessage.style.display = 'block';
+            if (statusTimer) clearTimeout(statusTimer);
+            statusTimer = setTimeout(() => { statusMessage.style.display = 'none'; }, 5000);
+        }
+
+        function startPolling(taskId) {
+            if (pollingInterval) clearInterval(pollingInterval);
+            pollingInterval = setInterval(async () => {
+                try {
+                    const response = await apiFetch(`/api/status/${encodeURIComponent(taskId)}`);
+                    const data = await response.json();
+                    if (!response.ok) {
+                        if (response.status === 404) { clearInterval(pollingInterval); pollingInterval = null; }
+                        return;
+                    }
+                    if (['succeeded', 'failed', 'cancelled'].includes(data.status)) {
+                        clearInterval(pollingInterval);
+                        pollingInterval = null;
+                        loadTasks();
+                        if (data.status === 'succeeded') showStatus('success', '转换完成！');
+                        else showStatus('error', `转换失败: ${data.error || 'Unknown error'}`);
+                    }
+                } catch (err) {
+                    console.error('status poll failed:', err);
+                }
+            }, 3000);
+        }
+
+        function getStatusText(status) {
+            const texts = {
+                queued: '排队中', running: '处理中', succeeded: '完成',
+                failed: '失败', cancelled: '已取消'
+            };
+            return texts[status] || status;
+        }
+
+        function clearViewerBody() {
+            const body = document.getElementById('viewerBody');
+            if (window.ObjViewer && window.ObjViewer.dispose) {
+                try { window.ObjViewer.dispose(); } catch (err) { console.warn(err); }
+            }
+            body.querySelectorAll('model-viewer, .viewer-note').forEach(el => el.remove());
+            body.querySelectorAll('canvas').forEach(el => el.remove());
+            const loading = document.getElementById('viewerLoading');
+            if (loading && loading.parentNode !== body) body.appendChild(loading);
+        }
+
+        function setViewerLoading(visible, message = '正在加载模型...') {
+            const loading = document.getElementById('viewerLoading');
+            loading.textContent = message;
+            loading.style.display = visible ? 'flex' : 'none';
+        }
+
+        function closeViewer() {
+            document.getElementById('viewerModal').classList.remove('open');
+            clearViewerBody();
+        }
+
+        function showViewerNote(message) {
+            const body = document.getElementById('viewerBody');
+            clearViewerBody();
+            const note = document.createElement('div');
+            note.className = 'viewer-note';
+            note.textContent = message;
+            body.appendChild(note);
+            setViewerLoading(false);
+        }
+
+        function openGlbViewer(url, taskId) {
+            const body = document.getElementById('viewerBody');
+            clearViewerBody();
+            setViewerLoading(true);
+            if (!customElements.get('model-viewer')) {
+                setTimeout(() => {
+                    if (!customElements.get('model-viewer')) {
+                        showViewerNote('model-viewer 组件加载失败，请检查网络或直接下载模型后使用本地查看器。');
+                    } else {
+                        openGlbViewer(url, taskId);
+                    }
+                }, 800);
+                return;
+            }
+
+            const viewer = document.createElement('model-viewer');
+            viewer.setAttribute('src', url);
+            viewer.setAttribute('alt', `Task ${taskId}`);
+            viewer.setAttribute('camera-controls', '');
+            viewer.setAttribute('auto-rotate', '');
+            viewer.setAttribute('shadow-intensity', '1');
+            viewer.setAttribute('exposure', '1');
+            viewer.setAttribute('environment-image', 'neutral');
+            viewer.style.width = '100%';
+            viewer.style.height = '100%';
+            viewer.addEventListener('load', () => setViewerLoading(false));
+            viewer.addEventListener('error', () => {
+                setViewerLoading(false);
+                showViewerNote('模型加载失败。可能是模型文件较大，请稍后重试，或下载后用本地软件查看。');
+            });
+            body.appendChild(viewer);
+        }
+
+        function openObjViewer(url, taskId) {
+            const body = document.getElementById('viewerBody');
+            clearViewerBody();
+            setViewerLoading(true);
+            let attempts = 0;
+
+            const tryInit = () => {
+                if (window.ObjViewer && window.ObjViewer.init) {
+                    window.ObjViewer.init(body, url).catch(err => {
+                        console.error(err);
+                        showViewerNote('OBJ 模型加载失败，请下载后用本地软件查看。');
+                    });
+                } else {
+                    attempts += 1;
+                    if (attempts > 40) {
+                        showViewerNote('three.js 组件加载失败，请检查网络后刷新页面重试。');
+                        return;
+                    }
+                    setTimeout(tryInit, 250);
+                }
+            };
+            tryInit();
+        }
+
+        function openViewer(url, format, taskId) {
+            const modal = document.getElementById('viewerModal');
+            const title = document.getElementById('viewerTitle');
+            title.textContent = `3D 模型预览 - ${taskId}`;
+            modal.classList.add('open');
+
+            if (format === 'obj') {
+                openObjViewer(url, taskId);
+            } else if (format === 'usdz') {
+                openGlbViewer(url, taskId);
+                setTimeout(() => {
+                    if (document.getElementById('viewerLoading').style.display !== 'none') {
+                        showViewerNote('USDZ 在桌面浏览器上通常不可预览，建议下载后在支持 USDZ 的设备上查看。');
+                    }
+                }, 3500);
+            } else {
+                openGlbViewer(url, taskId);
+            }
+        }
+
+        async function deleteTask(taskId) {
+            if (!confirm(`确定删除任务 ${taskId} 吗？云端任务和本地缓存都会被删除。`)) return;
+            try {
+                const response = await apiFetch(`/api/delete/${encodeURIComponent(taskId)}`, { method: 'DELETE' });
+                if (response.ok) loadTasks();
+                else showStatus('error', '删除失败');
+            } catch (err) {
+                showStatus('error', `删除失败: ${err.message}`);
+            }
+        }
+
+        async function loadTasks() {
+            try {
+                const response = await apiFetch('/api/tasks');
+                const data = await response.json();
+                if (response.status === 401) { showAuthBox(); return; }
+                if (!response.ok) throw new Error(data.error || '加载失败');
+
+                const tasksList = document.getElementById('tasksList');
+                if (!data.tasks || data.tasks.length === 0) {
+                    tasksList.innerHTML = '<div class="empty-state">暂无任务</div>';
+                    return;
+                }
+
+                tasksList.innerHTML = data.tasks.map(task => {
+                    const downloadUrl = task.download_url || task.output_url;
+                    const format = escapeHtml((task.file_format || 'glb').toUpperCase());
+                    const quality = escapeHtml(task.subdivision_level || '-');
+                    const previewButton = task.preview_url ? `
+                        <button class="btn-preview" type="button"
+                            data-preview-url="${escapeHtml(task.preview_url)}"
+                            data-preview-format="${escapeHtml((task.file_format || 'glb').toLowerCase())}"
+                            data-preview-id="${escapeHtml(task.id)}">在线预览</button>
+                    ` : '';
+                    return `
+                        <div class="task-item">
+                            <div class="task-header">
+                                <span class="task-id">${escapeHtml(task.id)}</span>
+                                <span class="status-badge ${escapeHtml(task.status)}">${escapeHtml(getStatusText(task.status))}</span>
+                            </div>
+                            <div class="task-info">格式: ${format} | 质量: ${quality}</div>
+                            ${task.error ? `<div class="task-info">错误: ${escapeHtml(task.error)}</div>` : ''}
+                            ${downloadUrl ? `<a href="${escapeHtml(downloadUrl)}" class="output-link" target="_blank">下载 3D 模型 ↓</a>` : ''}
+                            ${previewButton}
+                            <button class="btn-danger" data-delete-id="${escapeHtml(task.id)}" type="button">删除</button>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Failed to load tasks:', error);
+            }
+        }
+
+        document.getElementById('tasksList').addEventListener('click', e => {
+            const deleteButton = e.target.closest('[data-delete-id]');
+            if (deleteButton) {
+                deleteTask(deleteButton.dataset.deleteId);
+                return;
+            }
+            const previewButton = e.target.closest('[data-preview-url]');
+            if (previewButton) {
+                openViewer(
+                    previewButton.dataset.previewUrl,
+                    previewButton.dataset.previewFormat,
+                    previewButton.dataset.previewId
+                );
+            }
+        });
+        document.getElementById('viewerClose').addEventListener('click', closeViewer);
+        document.getElementById('viewerModal').addEventListener('click', e => {
+            if (e.target === document.getElementById('viewerModal')) closeViewer();
+        });
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') closeViewer();
+        });
+        document.getElementById('authSaveBtn').addEventListener('click', saveToken);
+
+        // Load config first, then the task list.
+        (async function init() {
+            try {
+                if (authToken) {
+                    document.cookie = `imageto3d_token=${encodeURIComponent(authToken)}; path=/; SameSite=Strict; max-age=31536000`;
+                }
+                const response = await fetch('/api/config');
+                const data = await response.json();
+                authRequired = data.auth_required;
+                if (authRequired && !authToken) {
+                    showAuthBox();
+                } else {
+                    loadTasks();
+                }
+            } catch (err) {
+                console.error('Failed to load config:', err);
+                loadTasks();
+            }
+        })();
+
+        // Refresh tasks every 10 seconds.
+        setInterval(loadTasks, 10000);
+    </script>
+</body>
+</html>
